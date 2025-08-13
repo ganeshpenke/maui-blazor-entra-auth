@@ -7,7 +7,26 @@ namespace MauiBlazorEntraAuth.Security
     public class EntraAuthStateProvider : AuthenticationStateProvider
     {
         private ClaimsPrincipal currentUser = new ClaimsPrincipal(new ClaimsIdentity());
-        private readonly Task<AuthenticationState> authenticationState;
+
+        public string accessToken;
+        public string AccessToken => accessToken;
+        private DateTimeOffset? accessTokenExpiration;
+        private readonly IPublicClientApplication pca;
+        private readonly string[] scopes = { "User.Read" };
+
+        public EntraAuthStateProvider()
+        {
+            var pcaOptions = new PublicClientApplicationOptions
+            {
+                ClientId = "854d789e-2c46-40d5-ab79-f068b27d813d",
+                TenantId = "8f6bd982-92c3-4de0-985d-0e287c55e379",
+                RedirectUri = "http://localhost:7777"
+            };
+            pca = PublicClientApplicationBuilder
+                .CreateWithApplicationOptions(pcaOptions)
+                .WithAuthority(AzureCloudInstance.AzurePublic, pcaOptions.TenantId)
+                .Build();
+        }
         public override Task<AuthenticationState> GetAuthenticationStateAsync() => Task.FromResult(new AuthenticationState(currentUser));
 
         public Task LogInAsync()
@@ -28,26 +47,13 @@ namespace MauiBlazorEntraAuth.Security
 
         private async Task<ClaimsPrincipal> LoginWithExternalProviderAsync()
         {
-
-            var pcaOptions = new PublicClientApplicationOptions
-            {
-                ClientId = "your-client-id",
-                TenantId = "your-tenant-id",
-                RedirectUri = "http://localhost:5002",
-            };
-
-            var pca = PublicClientApplicationBuilder.CreateWithApplicationOptions(pcaOptions).Build();
-            var scopes = new[] { "User.Read" };
-            var accounts = await pca.GetAccountsAsync();
-            var result = await pca.AcquireTokenInteractive(scopes)
-                                   .WithAccount(accounts.FirstOrDefault())
-                                   .ExecuteAsync();
+            var result = await AcquireTokenAsync();
 
             var claims = new List<Claim>
-        {
-            new Claim(ClaimTypes.Name, result.Account.Username),
-            new Claim("AccessToken", result.AccessToken),
-        };
+            {
+                new Claim(ClaimTypes.Name, result.Account.Username),
+                new Claim("AccessToken", result.AccessToken),
+            };
 
             var identity = new ClaimsIdentity(claims, "Custom");
             return new ClaimsPrincipal(identity);
@@ -60,5 +66,46 @@ namespace MauiBlazorEntraAuth.Security
                 Task.FromResult(new AuthenticationState(currentUser)));
         }
 
+        private async Task<AuthenticationResult> AcquireTokenAsync()
+        {
+            var accounts = await pca.GetAccountsAsync();
+            IAccount account = accounts.FirstOrDefault();
+
+            AuthenticationResult result;
+            try
+            {
+                if (account != null)
+                {
+                    result = await pca.AcquireTokenSilent(scopes, account)
+                                      .ExecuteAsync();
+                }
+                else
+                {
+                    result = await pca.AcquireTokenSilent(scopes, accounts.FirstOrDefault())
+                                      .ExecuteAsync();
+                }
+            }
+            catch (MsalUiRequiredException)
+            {
+                result = await pca.AcquireTokenInteractive(scopes)
+                                  .WithAccount(accounts.FirstOrDefault())
+                                  .ExecuteAsync();
+            }
+
+            accessToken = result.AccessToken;
+            accessTokenExpiration = result.ExpiresOn;
+
+            return result;
+        }
+
+        public async Task<string> GetAccessTokenAsync()
+        {
+            if (accessTokenExpiration.HasValue && DateTimeOffset.UtcNow < accessTokenExpiration.Value.ToUniversalTime())
+            {
+                return accessToken;
+            }
+            await AcquireTokenAsync();
+            return accessToken;
+        }
     }
 }
