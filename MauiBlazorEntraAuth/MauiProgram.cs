@@ -1,4 +1,7 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using MauiBlazorEntraAuth.Security;
+using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
 
 namespace MauiBlazorEntraAuth
 {
@@ -17,9 +20,11 @@ namespace MauiBlazorEntraAuth
             builder.Services.AddMauiBlazorWebView();
 
 #if DEBUG
-    		builder.Services.AddBlazorWebViewDeveloperTools();
-    		builder.Logging.AddDebug();
+            builder.Services.AddBlazorWebViewDeveloperTools();
+            builder.Logging.AddDebug();
 #endif
+            builder.Services.AddAuthorizationCore();
+            builder.Services.TryAddScoped<AuthenticationStateProvider, EntraAuthStateProvider>();
 
             return builder.Build();
         }
