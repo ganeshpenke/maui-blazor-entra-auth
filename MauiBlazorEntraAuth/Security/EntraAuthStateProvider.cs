@@ -18,9 +18,9 @@ namespace MauiBlazorEntraAuth.Security
         {
             var pcaOptions = new PublicClientApplicationOptions
             {
-                ClientId = "854d789e-2c46-40d5-ab79-f068b27d813d",
-                TenantId = "8f6bd982-92c3-4de0-985d-0e287c55e379",
-                RedirectUri = "http://localhost:7777"
+                ClientId = "your-client-id",
+                TenantId = "your-tenant-id",
+                RedirectUri = "http://localhost:5002"
             };
             pca = PublicClientApplicationBuilder
                 .CreateWithApplicationOptions(pcaOptions)
